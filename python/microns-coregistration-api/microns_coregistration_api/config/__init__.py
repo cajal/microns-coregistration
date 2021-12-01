@@ -29,6 +29,16 @@ def register_externals(schema_name:str):
         config_utils.register_externals(external_stores)
 
 
+def register_adapters(schema_name:str, context=None):
+    """
+    Imports the adapters for a schema_name into the global namespace.
+    """
+    adapter_objects = config_mapping[SCHEMAS(schema_name)]["adapters"]
+    
+    if adapter_objects is not None:
+        config_utils.register_adapters(adapter_objects, context=context)
+
+
 def register_bases(schema_name:str, module):
     """
     Maps base classes to DataJoint tables.
