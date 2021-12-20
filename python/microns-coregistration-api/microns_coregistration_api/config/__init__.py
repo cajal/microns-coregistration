@@ -1,96 +1,37 @@
 """
 Configuration package/module for microns-coregistration.
 """
-
-import inspect
-import traceback
-from enum import Enum
+import datajoint.datajoint_plus as djp
+from microns_utils.config_utils import SchemaConfig
 from . import adapters
 from . import externals
-from . import bases
-try:
-    import datajoint as dj
-except:
-    traceback.print_exc()
-    raise ImportError('DataJoint package not found.')
-from microns_utils import config_utils
 
+djp.enable_datajoint_flags()
 
-config_utils.enable_datajoint_flags()
+minnie_em_config = SchemaConfig(
+    module_name='minnie_em',
+    schema_name='microns_minnie_em',
+    externals=externals.minnie_em,
+    adapters=adapters.minnie_em
+)
 
+minnie65_auto_match_config = SchemaConfig(
+    module_name='minnie65_auto_match',
+    schema_name='microns_minnie65_auto_match',
+    externals=externals.minnie65_auto_match,
+    adapters=adapters.minnie65_auto_match
+)
 
-def register_externals(schema_name:str):
-    """
-    Registers the external stores for a schema_name in this module.
-    """
-    external_stores = config_mapping[SCHEMAS(schema_name)]["externals"]
-    
-    if external_stores is not None:
-        config_utils.register_externals(external_stores)
+minnie65_coregistration_config = SchemaConfig(
+    module_name='minnie65_coregistration',
+    schema_name='microns_minnie65_coregistration',
+    externals=externals.minnie65_coregistration,
+    adapters=adapters.minnie65_coregistration
+)
 
-
-def register_adapters(schema_name:str, context=None):
-    """
-    Imports the adapters for a schema_name into the global namespace.
-    """
-    adapter_objects = config_mapping[SCHEMAS(schema_name)]["adapters"]
-    
-    if adapter_objects is not None:
-        config_utils.register_adapters(adapter_objects, context=context)
-
-
-def register_bases(schema_name:str, module):
-    """
-    Maps base classes to DataJoint tables.
-    """
-    bases = config_mapping[SCHEMAS(schema_name)]["bases"]
-
-    if bases is not None:
-        for base in bases:
-            config_utils.register_bases(base, module)
-        return module
-
-
-def create_vm(schema_name:str):
-    """
-    Creates a virtual module after registering the external stores, adapter objects, DatajointPlus and base classes.
-    """
-    schema = SCHEMAS(schema_name)
-    vm = config_utils._create_vm(schema.value, external_stores=config_mapping[schema]["externals"], adapter_objects=config_mapping[schema]["adapters"])
-    config_utils.add_datajoint_plus(vm)
-    register_bases(schema_name, vm)
-    return vm
-
-
-class SCHEMAS(Enum):
-    MINNIE_EM = 'microns_minnie_em'
-    MINNIE65_AUTO_MATCH = 'microns_minnie65_auto_match'
-    MINNIE65_COREGISTRATION = 'microns_minnie65_coregistration'
-    MINNIE65_MANUAL_MATCH = 'microns_minnie65_manual_match'
-
-
-config_mapping = {
-    SCHEMAS.MINNIE_EM: {
-        "externals": externals.minnie_em,
-        "adapters": None,
-        "bases": None
-    },
-
-    SCHEMAS.MINNIE65_AUTO_MATCH: {
-        "externals": externals.minnie65_auto_match,
-        "adapters": None,
-        "bases": None
-    },
-
-    SCHEMAS.MINNIE65_COREGISTRATION: {
-        "externals": externals.minnie65_coregistration,
-        "adapters": None,
-        "bases": None
-    },
-
-    SCHEMAS.MINNIE65_MANUAL_MATCH: {
-        "externals": externals.minnie65_manual_match,
-        "adapters": None,
-        "bases": None
-    }
-}
+minnie65_manual_match_config = SchemaConfig(
+    module_name='minnie65_manual_match',
+    schema_name='microns_minnie65_manual_match',
+    externals=externals.minnie65_manual_match,
+    adapters=adapters.minnie65_manual_match
+)
