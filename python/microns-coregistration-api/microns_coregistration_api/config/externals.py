@@ -3,7 +3,7 @@ Externals for DataJoint tables.
 """
 
 from pathlib import Path
-import datajoint.datajoint_plus as djp
+import datajoint_plus as djp
 
 base_path = Path() / '/mnt' / 'dj-stor01' / 'microns'
 minnie_stack_path = base_path / 'minnie' / 'stacks'
@@ -21,5 +21,9 @@ minnie65_coregistration = {
 }
 
 minnie65_manual_match = {
+    'stacks': djp.make_store_dict(minnie_stack_path)
+}
+
+multimatch = {
     'stacks': djp.make_store_dict(minnie_stack_path)
 }

@@ -1,14 +1,12 @@
-import datajoint as dj
-import numpy as np
-import pandas as pd
-import json
+"""
+DataJoint tables for manual match.
+"""
 
-from microns_coregistration_api import config
-schema_obj = config.SCHEMAS.MINNIE65_MANUAL_MATCH
+import datajoint_plus as djp
 
-config.register_adapters(schema_obj, context=locals())
-config.register_externals(schema_obj)
+from microns_coregistration_api.schemas import minnie65_manual_match as m65man
 
-schema = dj.schema(schema_obj.value)
-schema.spawn_missing_classes()
-schema.connection.dependencies.load()
+schema = m65man.schema
+config = m65man.config
+
+logger = djp.getLogger(__name__)

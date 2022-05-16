@@ -35,3 +35,10 @@ minnie65_manual_match_config = SchemaConfig(
     externals=externals.minnie65_manual_match,
     adapters=adapters.minnie65_manual_match
 )
+
+multimatch_config = SchemaConfig(
+    module_name='multimatch',
+    schema_name='microns_multimatch',
+    externals=externals.multimatch,
+    adapters=adapters.multimatch
+)
