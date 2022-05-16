@@ -15,6 +15,7 @@ x-shared: &common
     - /mnt:/mnt
   env_file:
     - .env
+  container_name: "microns-coregistration"
 
 services:
   notebook:

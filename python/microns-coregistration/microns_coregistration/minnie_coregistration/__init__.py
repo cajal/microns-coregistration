@@ -1,0 +1,7 @@
+import datajoint_plus as djp
+from . import minnie_em, minnie65_auto_match, minnie65_coregistration, minnie65_manual_match
+
+djp.reassign_master_attribute(minnie_em)
+djp.reassign_master_attribute(minnie65_auto_match)
+djp.reassign_master_attribute(minnie65_coregistration)
+djp.reassign_master_attribute(minnie65_manual_match)
