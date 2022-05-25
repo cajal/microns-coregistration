@@ -5,6 +5,9 @@ import datajoint as dj
 import datajoint_plus as djp
 
 from ..config import minnie65_coregistration_config as config
+from microns_nda_api.schemas import minnie_nda as nda
+from ..utils.coregistration_utils import aibs_coreg_transform
+from microns_utils.misc_utils import unwrap
 
 config.register_externals()
 config.register_adapters(context=locals())
@@ -50,5 +53,49 @@ class AdjustmentSet(djp.Lookup):
         -> Adjustment
         """
 
+
+@schema
+class TPStack(djp.Lookup):
+    definition = """
+    -> nda.Stack
+    """
+    contents = [{'animal_id': 17797, 'stack_session': 9, 'stack_idx': 19}]
+
+
+@schema
+class Coregistration(djp.Lookup):
+    hash_name = 'coregistration'
+    definition = """
+    coregistration : varchar(10) # hash of coregistration method
+    """
+
+    @classmethod
+    def run(cls, coords, key=None, transform_id=None):
+        assert (key is not None) ^ (transform_id is not None), 'Provide key or transform_id but not both'
+        if transform_id is not None:
+            key = {'transform_id': transform_id}
+        return cls.r1p(key).run(coords, **key)
+
+    class AIBS(djp.Part):
+        enable_hashing = True
+        hash_name = 'coregistration'
+        hashed_attrs = TPStack.primary_key + ['transform_id', 'version', 'direction', 'transform_type']
+        definition = """
+        -> master
+        ---
+        -> TPStack
+        transform_id         : int                          # id of the transform
+        version              : varchar(256)                 # coordinate framework
+        direction            : varchar(16)                  # direction of the transform (EMTP: EM -> 2P, TPEM: 2P -> EM)
+        transform_type       : varchar(16)                  # linear (more rigid) or spline (more nonrigid)
+        transform_args=null  : longblob                     # parameters of the transform
+        transform_solution=null : longblob                     # transform solution
+        """
+
+        def run(self, coords, **kwargs):
+            params = unwrap(self.fetch('version', 'direction', 'transform_type', 'transform_solution', as_dict=True))
+            return aibs_coreg_transform(coords, **params)
+            
+        
 schema.spawn_missing_classes()
 schema.connection.dependencies.load()
