@@ -10,7 +10,7 @@ djp.enable_datajoint_flags()
 
 minnie_em_config = SchemaConfig(
     module_name='minnie_em',
-    schema_name='microns_minnie_em',
+    schema_name='microns_minnie_em_v2',
     externals=externals.minnie_em,
     adapters=adapters.minnie_em
 )
@@ -34,6 +34,13 @@ minnie65_manual_match_config = SchemaConfig(
     schema_name='microns_minnie65_manual_match',
     externals=externals.minnie65_manual_match,
     adapters=adapters.minnie65_manual_match
+)
+
+dashboard_config = SchemaConfig(
+    module_name='dashboard',
+    schema_name='microns_coregistration_dashboard',
+    externals=externals.dashboard,
+    adapters=adapters.dashboard
 )
 
 multimatch_config = SchemaConfig(
