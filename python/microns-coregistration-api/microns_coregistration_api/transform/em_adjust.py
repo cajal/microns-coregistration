@@ -7,7 +7,7 @@ from pathlib import Path
 import numpy as np
 from microns_utils.model_utils import InterpModel, PolyModel
 from microns_utils.transform_utils import normalize
-from microns_utils.misc_utils import classproperty
+from microns_utils.misc_utils import classproperty, unwrap
 
 logger = logging.getLogger(__name__)
 
@@ -65,6 +65,45 @@ def em_grid_2D(axes, spacing=(25, 25)):
     return np.stack(np.meshgrid(np.arange(*bb_um[0], spacing[0]), np.arange(*bb_um[1], spacing[1]), indexing='ij'), -1).reshape(-1,2) * 1000
 
 
+def em_grid_3D(xrange='full', yrange='full', zrange='full', spacing=(25, 25, 25), return_as='nm', vx_res=None):
+    """
+    Generate a 3D array of grid points in the EM volume
+    
+    :param xrange: array of shape (n,) of EM x-values
+        Default : 'full' - uses entire range of EM x-dimension
+    :param yrange: array of shape (n,) of EM y-values
+        Default : 'full' - uses entire range of EM y-dimension
+    :param zrange: array of shape (n,) of EM z-values
+        Default : 'full' - uses entire range of EM z-dimension
+    :param spacing: tuple of shape (3,) with grid point spacing in microns for x, y, and z axis
+    :param return_as: (str) units to return array as
+        Options : 
+            - 'nm' (default) - nanometers
+            - 'vx' - voxels
+    :param vx_res: tuple of shape (3,) with voxel resolution if return_as='vx'
+        Default : em_adjust.em_bounds_vx
+    
+    :returns: N x 3 array of EM coordinates
+    """
+    em_bounds = em_bounds_nm
+    ranges = []
+    for r, b, s in zip([xrange, yrange, zrange], em_bounds.T, spacing):
+        if isinstance(r, str) and r == 'full':
+            r = b
+            r = r / 1000
+        else:
+            r = r / 1000
+            ranges.append(r)
+            continue
+        ranges.append(np.arange(*r, s))
+    grid = np.stack(np.meshgrid(*ranges, indexing='ij'), -1).reshape(-1, 3) * 1000
+    if return_as == 'nm':
+        return grid 
+    elif return_as == 'vx':
+        vx_res = em_nm_per_vx if vx_res is None else vx_res
+        return grid / vx_res
+    
+    
 def run_2D_grid(model, axes):
     """
     Generates a regular 2D grid and runs through provided model.
@@ -120,21 +159,27 @@ class EMAdjust:
                 Param options:
                     pia_pts_npy_path - Path to npy file with pia points in nanometers to solve for pia model
                     wm_pts_npy_path - Path to npy file with white matter points in nanometers to solve for white matter model
-                    model - model type to use for solving pia and white matter.
+                    method - method to use for solving pia and white matter.
                         types :
-                            - linear - microns_utils.model_utils.PolyModel
-                            - quadratic - microns_utils.model_utils.PolyModel 
-                            - interpolation - microns_utils.model_utils.InterpModel with 
-                    linear_model_params - params to pass to linear model function
-                    quadratic_model_params - params to pass to quadratic model function
-                    interp_model_params - params to pass to interpolation function
+                            - "linear" - microns_utils.model_utils.PolyModel
+                            - "quadratic" - microns_utils.model_utils.PolyModel 
+                            - "interpolation" - microns_utils.model_utils.InterpModel with 
+                    method_params - dict of dictionaries
+                        "linear" - param dict to pass to linear model function
+                        "quadratic" - param dict to pass to quadratic model function
+                        "interpolation" - param dict to pass to interpolation function
                     rotation - the desired rotation (degrees) to apply to coordinate system before solving for pia/ wm and adjusting
                     grid_spacing - the spacing in microns between grid points for :func:`make_grid`
                     grid_axes - the axes to use for making grid in :func:`make_grid`
 
         To solve the model once and then adjust points:
-            adjuster = EMAdjust(method, rotation)
-            adjuster.adjust(points)
+            To solve once:
+                adjuster = EMAdjust() # to use defaults in EMAdjust.defaults
+            Or
+                adjuster = EMAdjust(method, rotation) # to overwrite defaults
+
+            To adjust points:
+                adjuster.adjust(points)
 
     """ 
     _defaults = {}
@@ -143,11 +188,13 @@ class EMAdjust:
     def defaults(cls):
         cls._defaults.setdefault('pia_pts_npy_path', Path(__location__).joinpath('./data/pia_pts.npy'))
         cls._defaults.setdefault('wm_pts_npy_path', Path(__location__).joinpath('./data/wm_pts.npy'),)
-        cls._defaults.setdefault('model', 'linear')
+        cls._defaults.setdefault('method', 'linear')
         cls._defaults.setdefault('rotation', 3.5)
-        cls._defaults.setdefault('linear_model_params', {'model': 'x + y'})
-        cls._defaults.setdefault('quadratic_model_params', {'model': 'x + y + x*y + x^2 + y^2'})
-        cls._defaults.setdefault('interp_model_params', {'method': 'rbf'})
+        cls._defaults.setdefault('method_params', {
+            'linear': {'model': 'x + y'},
+            'quadratic': {'model': 'x + y + x*y + x^2 + y^2'},
+            'interpolation': {'method': 'rbf'},
+        })
         cls._defaults.setdefault('grid_spacing', (25, 25))
         cls._defaults.setdefault('grid_axes', (0, 2))
         return cls._defaults
@@ -173,67 +220,84 @@ class EMAdjust:
     def wm_mean_y(cls):
         return cls.wm_pts.mean(0)[1]
 
-    def __init__(self, method, rotation=None):
+    def __init__(self, method='default', rotation='default', method_params='default'):
         """
         Solve model for pia and white matter (wm) with optional rotation.
 
         :param method: (str) method to solve pia/ wm model
+            Default : "default" - uses EMAdjust.defaults["method"]
             Options : 
-                - linear - microns_utils.model_utils.PolyModel solved with EMAdjust.defaults['linear_model_params']
-                - quadratic - microns_utils.model_utils.PolyModel solved with EMAdjust.defaults['quadratic_model_params']
-                - interpolation - microns_utils.model_utils.InterpModel solved with EMAdjust.defaults['interp_model_params']
+                - "linear" - microns_utils.model_utils.PolyModel solved with EMAdjust.defaults['linear_method_params']
+                - "quadratic" - microns_utils.model_utils.PolyModel solved with EMAdjust.defaults['quadratic_method_params']
+                - "interpolation" - microns_utils.model_utils.InterpModel solved with EMAdjust.defaults['interp_method_params']
             
-        :param rotation: (float) optional rotation (degrees) to apply before solving
-            default - None
-
-        Usage: 
-            adjuster = EMAdjust(method, rotation)
-            adjuster.adjust(points),
-                where points is an Nx3 array of x, y, z EM coordinates in nanometers
+        :param rotation: (float) rotation in degrees to use for solver, set rotation=None or rotation=0 for no rotation.
+            Default : "default" - uses EMAdjust.defaults["rotation"]
+        
+        :param method_params: (dict of dictionaries) arguments to pass to solver
+            Default : "default" - uses EMAdjust.defaults["method_params"]
+        
         """
-        self.method = method
+        method, rotation, method_params = self._check_for_defaults(**{'method':method, 'rotation':rotation, 'method_params':method_params})
+        
+        self.method = self._validate_method(method)
         self.rotation = rotation
+        self.method_params = method_params
+
+        self.pia_pts = self.pia_pts if self.rotation is None else rotate_points(self.pia_pts, degree=self.rotation)
+        self.wm_pts = self.wm_pts if self.rotation is None else rotate_points(self.wm_pts, degree=self.rotation)
         
         # solve models
-        self.pia_model = self.solve(self.method, self.pia_pts if self.rotation is None else rotate_points(self.pia_pts, degree=self.rotation))
-        self.wm_model = self.solve(self.method, self.wm_pts if self.rotation is None else rotate_points(self.wm_pts, degree=self.rotation))
+        self.pia_model = self.solve(self.pia_pts, self.method, self.method_params)
+        self.wm_model = self.solve(self.wm_pts, self.method, self.method_params)
     
     @classmethod
-    def validate_points(cls, points):
+    def _validate_points(cls, points):
         points = np.array(points)
         assert points.ndim == 2 and points.shape[-1] == 3, 'Array must be 2D with shape N x 3'
         return points
 
     @classmethod
-    def solve(cls, method, data):
+    def _validate_method(cls, method):
+        methods = ['linear', 'quadratic', 'interpolation']
+        if method not in methods:
+            raise AttributeError(f'method not recognized. Options are {methods}.' )
+        return method
+
+    @classmethod
+    def _check_for_defaults(cls, **kwargs):
+        return unwrap([cls.defaults[k] if v=='default' else v for k, v in kwargs.items()])
+
+    @classmethod
+    def solve(cls, data, method='default', method_params='default'):
         """
         Solves for a model of data with given method.
         
         :param method: (str) method to use for solving
             Options : 
-                - linear - microns_utils.model_utils.PolyModel solved with EMAdjust.defaults['linear_model_params']
-                - quadratic - microns_utils.model_utils.PolyModel solved with EMAdjust.defaults['quadratic_model_params']
-                - interpolation - microns_utils.model_utils.InterpModel solved with EMAdjust.defaults['interp_model_params']
-        
+                - "linear" - microns_utils.model_utils.PolyModel solved with EMAdjust.defaults['linear_method_params']
+                - "quadratic" - microns_utils.model_utils.PolyModel solved with EMAdjust.defaults['quadratic_method_params']
+                - "interpolation" - microns_utils.model_utils.InterpModel solved with EMAdjust.defaults['interp_method_params']
         :param data: N x 3 array of x, y, z EM coordinates in nanometers
+        :param method_params: (dict) params to pass to method
 
         :returns: solved model
         """
-        data = cls.validate_points(data)
+        data = cls._validate_points(data)
+        method, method_params = cls._check_for_defaults(**{'method':method, 'method_params':method_params})
+        method = cls._validate_method(method)
 
         if method == 'linear':
-            return PolyModel(data[:, [0,2]], data[:, [1]], **cls.defaults['linear_model_params'])
+            return PolyModel(data[:, [0, 2]], data[:, [1]], **method_params[method])
             
         if method == 'quadratic':
-            return PolyModel(data[:, [0,2]], data[:, [1]], **cls.defaults['quadratic_model_params'])
+            return PolyModel(data[:, [0, 2]], data[:, [1]], **method_params[method])
             
         if method == 'interpolation':
-            return InterpModel(data[:, [0,2]], data[:, [1]], **cls.defaults['interp_model_params'])
-        
-        raise AttributeError('method not recognized. Options are "linear", "quadratic", "interpolation".' )
+            return InterpModel(data[:, [0, 2]], data[:, [1]], **method_params[method])
     
     @classmethod
-    def normalize(cls, points, pia_y, wm_y):
+    def _normalize(cls, points, pia_y, wm_y):
         """
         Normalize points between pia and white matter
 
@@ -243,8 +307,6 @@ class EMAdjust:
 
         :returns: N x 3 array of normalized EM points in nanometers
         """
-        points = cls.validate_points(points)
-
         return np.hstack([
                 points[:, [0]], 
                 normalize(points[:, [1]], pia_y, wm_y, cls.pia_mean_y, cls.wm_mean_y), 
@@ -252,68 +314,34 @@ class EMAdjust:
         ])
 
     @classmethod
-    def make_grid(cls, method, data):
-        """
-        Makes 2D grid of EM x, y,z coordinates after running through model.
-
-        :param method: Method to run solver with. See EMAdjust.solve
-        :param data: (N x 3) array of EM coordinates in nanometers to solve model
-            Optionally can also pass the following strings:
-                - "pia" : solves model with EMAdjust.pia_pts
-                - "wm" : solves model with EMAdjust.wm_pts
-
-        Additional params:
-            grid axes specified by EMAdjust.defaults['grid_axes']
-            grid spacing (microns) specified by EMAdjust.defaults['grid_spacing']
-
-        :returns: N x 3 array of adjusted grid points in nanometers
-        """
-        if isinstance(data, str) and data  == 'pia':
-            data = cls.pia_pts
-        
-        if isinstance(data, str) and data == 'wm':
-            data = cls.wm_pts
-            
-        grid = em_grid_2D(axes=cls.defaults['grid_axes'], spacing=cls.defaults['grid_spacing'])
-        
-        data = cls.validate_points(data)
-
-        model = cls.solve(method, data)
-
-        return np.hstack([
-            grid[:, [0]], 
-            model.run(grid), 
-            grid[:, [1]]
-        ])
-
-    @classmethod
-    def solve_and_adjust(cls, points, model='default', rotation='default'):
+    def solve_and_adjust(cls, points, method='default', rotation='default', method_params='default'):
         """
         Solves model and adjusts points in one step.
 
         :param points: N x 3 array of x, y, z EM coordinates to adjust in nanometers
-        :param model: model to use to solve. See EMAdjust.solve
-            Default - "default" : uses EMAdjust.defaults["model"]
-        :param rotation: rotation to use for solver.
+        :param method: model to use to solve. See EMAdjust.solve
+            Default - "default" : uses EMAdjust.defaults["method"]
+        :param rotation: rotation in degrees to use for solver, set rotation=None or rotation=0 for no rotation.
             Default - "default" : uses EMAdjust.defaults["rotation"]
 
         :returns: N x 3 array of adjusted grid points in nanometers 
         """
-        points = cls.validate_points(points)
+        points = cls._validate_points(points)
+        rotation = cls._check_for_defaults(**{'rotation': rotation})
 
-        if model == 'default':
-            model = cls.defaults['model']
-        
-        if rotation == 'default':
-            rotation = cls.defaults['rotation']
+        if rotation is not None:
+            pia_pts = rotate_points(cls.pia_pts, degree=rotation)
+            wm_pts = rotate_points(cls.wm_pts, degree=rotation)
+            points = rotate_points(points, degree=rotation)
+        else:
+            pia_pts = cls.pia_pts
+            wm_pts = cls.wm_pts
 
-        pia_pts = rotate_points(cls.pia_pts, degree=rotation)
-        wm_pts = rotate_points(cls.wm_pts, degree=rotation)
-        pia_model = cls.solve(model, pia_pts)
-        wm_model = cls.solve(model, wm_pts)
+        pia_model = cls.solve(pia_pts, method, method_params)
+        wm_model = cls.solve(wm_pts, method, method_params)
         pia_y = pia_model.run(points[:, [0, 2]])
         wm_y = wm_model.run(points[:, [0, 2]])
-        return cls.normalize(points, pia_y, wm_y)
+        return cls._normalize(points, pia_y, wm_y)
 
     def adjust(self, points):
         """
@@ -323,26 +351,34 @@ class EMAdjust:
 
         :returns: N x 3 array of adjusted grid points in nanometers 
         """
-        points = self.validate_points(points)
+        points = self._validate_points(points)
 
         if self.rotation is not None:
             points = rotate_points(points, degree=self.rotation)
-            
+        
         pia_y = self.pia_model.run(points[:, [0, 2]])
         wm_y = self.wm_model.run(points[:, [0, 2]])
         
-        return self.normalize(points, pia_y, wm_y)
+        return self._normalize(points, pia_y, wm_y)
 
-    @property
-    def pia_grid(self):
+    def make_pia_grid(self, grid_spacing=(25, 25, 25)):
         """
         Returns Nx3 array of EM coordinates in nanometers corresponding to adjusted pia grid
         """
-        return self.adjust(self.make_grid(self.method, self.pia_pts, self.defaults['grid_spacing']))
-    
-    @property
-    def wm_grid(self):
+        grid = rotate_points(em_grid_3D(yrange=self.pia_mean_y, spacing=grid_spacing), degree=self.rotation)
+        return np.hstack([
+            grid[:, [0]], 
+            self.pia_model.run(grid[:, [0, 2]]), 
+            grid[:, [2]]
+        ])
+
+    def make_wm_grid(self, grid_spacing=(25, 25, 25)):
         """
-        Returns Nx3 array of EM coordinates in nanometers corresponding to adjusted white matter grid
+        Returns Nx3 array of EM coordinates in nanometers corresponding to adjusted wm grid
         """
-        return self.adjust(self.make_grid(self.method, self.wm_pts, self.defaults['grid_spacing']))
+        grid = rotate_points(em_grid_3D(yrange=self.wm_mean_y, spacing=grid_spacing), degree=self.rotation)
+        return np.hstack([
+            grid[:, [0]], 
+            self.wm_model.run(grid[:, [0, 2]]), 
+            grid[:, [2]]
+        ])
