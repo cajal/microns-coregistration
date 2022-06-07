@@ -1,5 +1,5 @@
 """
-DataJoint tables for MultMatch tool.
+MultMatch tool.
 """
 
 import secrets
@@ -22,7 +22,8 @@ from microns_morphology_api.schemas import \
 
 from ..schemas import dashboard as db, minnie65_coregistration as m65crg
 from ..schemas import multimatch as mm
-from ..utils import widget_utils as wu, coregistration_utils as cu, slack_utils as su
+from ..transform import coregistration as crg
+import microns_utils.widget_utils as wu
 
 schema = mm.schema
 config = mm.config
@@ -1111,7 +1112,7 @@ class MultiMatch:
         self.clear_match_protocol_feedback_button = wr.Button(on_interact=self.match_protocol_feedback_out.clear_output, description='Clear', button_style='info', layout={'width': '70px'})
 
         self.plot_output = wr.Output()
-        self.slack_output = su.SlackForWidget()
+        self.slack_output = wu.SlackForWidget(default_channel='#platinum_tracer_notifications')
 
         self.submit_lag_report_button = wr.Button(description='Report Lag', on_interact=self.submit_report, action_kws=dict(lag=True), layout=dict(width='auto'))
 
@@ -1604,8 +1605,8 @@ class MultiMatch:
                 scan_vess = self.field_unit_object.scan_vess
                 scan_nug_seg = self.field_unit_object.scan_nuc_seg
 
-                self._images['scan'] = cu.normalize(field_image, newrange=[0,1], astype=np.float, clip_bounds=[0, field_image.max()])
-                self._images['scan_vess'] = cu.normalize(scan_vess, newrange=[0,1], astype=np.float, clip_bounds=[0, scan_vess.max()])  
+                self._images['scan'] = crg.normalize(field_image, newrange=[0,1], astype=np.float, clip_bounds=[0, field_image.max()])
+                self._images['scan_vess'] = crg.normalize(scan_vess, newrange=[0,1], astype=np.float, clip_bounds=[0, scan_vess.max()])  
                 self._images['scan_nuc_seg'] = scan_nug_seg
         
         if update_vess:
@@ -1615,7 +1616,7 @@ class MultiMatch:
             else:
                 im = self.stack_loaders['vess'].get_stack_images(depth=self.plot_kws['depth'], load_mode='view')
             
-            self._images['vess'] = cu.normalize(im, newrange=[0,1], astype=np.float, clip_bounds=[0, im.max()])
+            self._images['vess'] = crg.normalize(im, newrange=[0,1], astype=np.float, clip_bounds=[0, im.max()])
                 
         if update_prob:
             if self.multimatch_params['load_mode']=='cache':
@@ -1654,7 +1655,7 @@ class MultiMatch:
                 ims = self.stack_loaders['em'].get_stack_images(depth_range=(self.plot_kws["depth"]-mean_padding, self.plot_kws["depth"]+mean_padding), load_mode='view')
 
             mean = np.mean(ims, axis=0)
-            im = cu.normalize(mean, clip_bounds=[100,150], newrange=[0,1], astype=np.float)
+            im = crg.normalize(mean, clip_bounds=[100,150], newrange=[0,1], astype=np.float)
             self._images['em'] = im
 
         if update_m35em:
@@ -1667,7 +1668,7 @@ class MultiMatch:
                 ims = self.stack_loaders['m35em'].get_stack_images(depth_range=(self.plot_kws["depth"]-mean_padding, self.plot_kws["depth"]+mean_padding), load_mode='view')
 
             mean = np.mean(ims, axis=0)
-            im = cu.normalize(mean, clip_bounds=[100,150], newrange=[0,1], astype=np.float)
+            im = crg.normalize(mean, clip_bounds=[100,150], newrange=[0,1], astype=np.float)
             self._images['m35em'] = im
 
 
@@ -2665,22 +2666,22 @@ class MultiMatch:
             selected_unit_anno_layer = None
         
         if self.nucleus_object is not None:
-            reference_nuc_layer = statebuilder.SegmentationLayerConfig(cu.NgLinks.nuc_src, name='reference-nucleus', fixed_ids=[self.nucleus_object.nucleus_key.nucleus_id])
+            reference_nuc_layer = statebuilder.SegmentationLayerConfig(crg.NgLinks.nuc_src, name='reference-nucleus', fixed_ids=[self.nucleus_object.nucleus_key.nucleus_id])
             ref_nuc_visible=True
         else:
-            reference_nuc_layer = statebuilder.SegmentationLayerConfig(cu.NgLinks.nuc_src, name='reference-nucleus')
+            reference_nuc_layer = statebuilder.SegmentationLayerConfig(crg.NgLinks.nuc_src, name='reference-nucleus')
             ref_nuc_visible=False
 
         if self.selected_nucleus is not None:
-            selected_nuc_layer = statebuilder.SegmentationLayerConfig(cu.NgLinks.nuc_src, name='selected-nucleus', fixed_ids=[self.selected_nucleus])
+            selected_nuc_layer = statebuilder.SegmentationLayerConfig(crg.NgLinks.nuc_src, name='selected-nucleus', fixed_ids=[self.selected_nucleus])
             sel_nuc_visible=True
         else:
-            selected_nuc_layer = statebuilder.SegmentationLayerConfig(cu.NgLinks.nuc_src, name='selected-nucleus')
+            selected_nuc_layer = statebuilder.SegmentationLayerConfig(crg.NgLinks.nuc_src, name='selected-nucleus')
             sel_nuc_visible = False
 
         
 
-        base_sb = statebuilder.StateBuilder([cu.NgLinks.em_layer, cu.NgLinks.seg_layer, cu.NgLinks.nuc_layer, reference_nuc_layer, selected_nuc_layer])
+        base_sb = statebuilder.StateBuilder([crg.NgLinks.em_layer, crg.NgLinks.seg_layer, crg.NgLinks.nuc_layer, reference_nuc_layer, selected_nuc_layer])
         field_units_sb = statebuilder.StateBuilder([current_centroids_anno_layer]) if current_centroids_anno_layer is not None else None
         selected_unit_sb = statebuilder.StateBuilder([selected_unit_anno_layer]) if selected_unit_anno_layer is not None else None
         reference_unit_sb = statebuilder.StateBuilder([reference_unit_anno_layer]) if reference_unit_anno_layer is not None else None
@@ -2717,8 +2718,8 @@ class MultiMatch:
         if from_queue_module:
             nucleus_id = self.nucleus_queue_module.queue.widget.value.nucleus_id
 
-        nuc_layer = statebuilder.SegmentationLayerConfig(cu.NgLinks.nuc_src, name='nuclear-seg', fixed_ids=[nucleus_id])
-        base_sb = statebuilder.StateBuilder([cu.NgLinks.em_layer, cu.NgLinks.seg_layer, nuc_layer])
+        nuc_layer = statebuilder.SegmentationLayerConfig(crg.NgLinks.nuc_src, name='nuclear-seg', fixed_ids=[nucleus_id])
+        base_sb = statebuilder.StateBuilder([crg.NgLinks.em_layer, crg.NgLinks.seg_layer, nuc_layer])
 
         json_state = base_sb.render_state(return_as='dict')
 
