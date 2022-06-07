@@ -144,10 +144,10 @@ class EMAdjust:
         cls._defaults.setdefault('pia_pts_npy_path', Path(__location__).joinpath('./data/pia_pts.npy'))
         cls._defaults.setdefault('wm_pts_npy_path', Path(__location__).joinpath('./data/wm_pts.npy'),)
         cls._defaults.setdefault('model', 'linear')
+        cls._defaults.setdefault('rotation', 3.5)
         cls._defaults.setdefault('linear_model_params', {'model': 'x + y'})
         cls._defaults.setdefault('quadratic_model_params', {'model': 'x + y + x*y + x^2 + y^2'})
         cls._defaults.setdefault('interp_model_params', {'method': 'rbf'})
-        cls._defaults.setdefault('rotation', 3.5)
         cls._defaults.setdefault('grid_spacing', (25, 25))
         cls._defaults.setdefault('grid_axes', (0, 2))
         return cls._defaults
