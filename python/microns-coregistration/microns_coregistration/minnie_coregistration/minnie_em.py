@@ -2,37 +2,22 @@
 DataJoint tables for processing of minnie EM data.
 """
 
+from datetime import datetime
 import datajoint_plus as djp
+from datajoint_plus.utils import classproperty
 import numpy as np
 import traceback
+from pathlib import Path
 
 from microns_coregistration_api.schemas import minnie_em as em, minnie65_coregistration as m65crg
 
 import microns_utils.ap_utils as apu
+import microns_utils.filepath_utils as fpu
 
 schema = em.schema
 config = em.config
 
 logger = djp.getLogger(__name__)
-
-
-class Methods:
-    class FillKeySource:
-        @classmethod
-        def fill(cls):
-            cls.insert(cls.key_source)
-
-    class FillParts:
-        @classmethod
-        def fill(cls, parts_kws={}):
-            for part in cls.parts(**parts_kws if parts_kws != {} else dict(as_cls=True)):
-                try:
-                    print(f'    --> Filling part table {part.__name__}...')
-                    part.fill()
-                except:
-                    traceback.print_exc()
-                    print(f'Could not fill for part: {part.__name__}')
-
 
 # DATAJOINT TABLES
 
@@ -66,14 +51,14 @@ class EM(em.EM):
                             'max_pt_x_anat': 'lateral',
                             'max_pt_y_anat': 'deep',
                             'max_pt_z_anat': 'anterior',
-                            'cv_path' : 'precomputed://https://minnie.microns-daf.com/proxy/minniev1_em',
+                            'cv_path' : 'precomputed://https://s3-hpcrc.rc.princeton.edu/minnie65/aligned_image',
                             'description': "This is Seung lab's first alignment of the 1mm x 1mm x 40um IARPA dataset from mouse V1 in MICrONS phase 2."
                         }
                         cls.insert1(data, skip_duplicates=True)
 
                     if alignment == 2:
-                        cv_path = 'precomputed://https://seungdata.princeton.edu/minnie65-phase3-em/aligned/v1'
-                        description = "This is Seung lab's second alignment of the IARPA 'minnie65' dataset, completed in the spring of 2020 that used the seamless approach."
+                        cv_path = 'precomputed://https://bossdb-open-data.s3.amazonaws.com/iarpa_microns/minnie/minnie65/em'
+                        description = "This is the second alignment of the IARPA 'minnie65' dataset, completed in the spring of 2020 that used the seamless approach."
                         stats = apu.get_stats_from_cv_path(cv_path, mip=0)
                         res = np.array([4, 4, 40])
                         ctr_pt_x, ctr_pt_y, ctr_py_z = (stats['ctr_pt'] * stats['res']) / res
@@ -107,7 +92,7 @@ class EM(em.EM):
                         cls.insert1(data, skip_duplicates=True)
 
             if em_name == 'minnie35':
-                cv_path = 'precomputed://gs://minnie35_2020_aligned_em/aligned/v1_sharded'
+                cv_path = 'precomputed://https://bossdb-open-data.s3.amazonaws.com/iarpa_microns/minnie/minnie35/em'
                 description = 'This is the IARPA "minnie35" dataset, completed in July of 2021.'
                 stats = apu.get_stats_from_cv_path(cv_path, mip=0)
                 res = np.array([4, 4, 40])
@@ -143,12 +128,8 @@ class EM(em.EM):
                 cls.insert1(data, skip_duplicates=True)
 
 
-class EMAdjusted(em.EMAdjusted, Methods.FillParts):
+class EMAdjusted(em.EMAdjusted):
     class CloudVolume(em.EMAdjusted.CloudVolume):
-        
-        @property
-        def key_source(self):
-            return EM()
 
         @classmethod
         def fill(cls):
@@ -203,11 +184,11 @@ class EMAdjusted(em.EMAdjusted, Methods.FillParts):
             # PHASE 3, crop EM to match nuclear segmentation and resize to 1000nm3
             # data source keys
             em_key = {'em_name': 'minnie65', 'alignment': 2, 'mip': 6}
-            seg_key = EMSegAdjusted.CloudVolume & (EMSeg.CloudVolume & {'em_seg_name': 'minnie3_v1_nuc_v0'}).proj('em_seg_name') & {'mip': 3}
+            seg_key = EMSegAdjusted.CloudVolume() & {'mip':3} & (EMSeg.CloudVolume & {'em_seg_name': 'minnie3_v1_nuc_v0'} ).proj()
 
             # source info
             em_info = EMAdjusted.CloudVolume & em_key
-            seg_info = EMSegAdjusted.CloudVolume & seg_key
+            seg_info = EMSegAdjusted.CloudVolume & seg_key.proj()
             
             em_min_pt = np.stack(em_info.fetch1('min_pt_x', 'min_pt_y', 'min_pt_z'), -1)
             em_max_pt = np.stack(em_info.fetch1('max_pt_x', 'max_pt_y', 'max_pt_z'), -1)
@@ -243,7 +224,7 @@ class EMAdjusted(em.EMAdjusted, Methods.FillParts):
             }, ignore_extra_fields=True, skip_duplicates=True, insert_to_master=True)
 
 
-class EMSeg(em.EMSeg, Methods.FillParts):
+class EMSeg(em.EMSeg):
 
     class CloudVolume(em.EMSeg.CloudVolume):      
         @classmethod
@@ -263,7 +244,7 @@ class EMSeg(em.EMSeg, Methods.FillParts):
                     em_name = 'minnie65',
                     alignment = 2,
                     em_seg_name = 'minnie3_v1_seg_v1',
-                    cv_path = 'graphene://https://minniev1.microns-daf.com/segmentation/table/minnie3_v1',
+                    cv_path = 'graphene://https://minnie.microns-daf.com/segmentation/table/minnie3_v1',
                     description = 'This is the first version of Minnie that has proofreading enabled. Was first enabled on June 24, 2020.'
                 ),
 
@@ -272,7 +253,7 @@ class EMSeg(em.EMSeg, Methods.FillParts):
                     em_name = 'minnie65',
                     alignment = 2,
                     em_seg_name = 'minnie3_v1_nuc_v0',
-                    cv_path = 'precomputed://https://seungdata.princeton.edu/minnie65-phase3-ws/nuclei/v0/seg',
+                    cv_path = 'precomputed://https://bossdb-open-data.s3.amazonaws.com/iarpa_microns/minnie/minnie65/nuclei',
                     description = 'Nuclear segmentation from the Allen Institute v0.'
                 ),
 
@@ -281,7 +262,7 @@ class EMSeg(em.EMSeg, Methods.FillParts):
                     em_name = 'minnie65',
                     alignment = 2,
                     em_seg_name = 'minnie3_v1_public_flat_v117',
-                    cv_path = 'precomputed://https://storage.googleapis.com/iarpa_microns/minnie/minnie65/seg',
+                    cv_path = 'graphene://https://minnie.microns-daf.com/segmentation/table/minnie65_public_v117',
                     description = 'minnie65 phase 3 flat segmentation (v117_public)'
                 ),
 
@@ -291,7 +272,7 @@ class EMSeg(em.EMSeg, Methods.FillParts):
                     alignment = 2,
                     em_seg_name = 'minnie3_v1_vess_v117',
                     segment_id = 864691136534887842,
-                    cv_path = 'precomputed://https://storage.googleapis.com/iarpa_microns/minnie/minnie65/seg',
+                    cv_path = 'graphene://https://minnie.microns-daf.com/segmentation/table/minnie65_public_v117',
                     description = 'vessel segmentation from minnie65 phase 3 flat segmentation (v117_public)'
                 ),
 
@@ -332,86 +313,90 @@ class EMSeg(em.EMSeg, Methods.FillParts):
             cls.insert1(phase_3_flat_seg_key, **insert_kwargs)
 
 
-class EMSegAdjusted(em.EMSegAdjusted, Methods.FillParts):
+class EMSegAdjusted(em.EMSegAdjusted):
     
     class CloudVolume(em.EMSegAdjusted.CloudVolume):
-        @property
-        def key_source(self):
-            return EMSeg.CloudVolume()         
 
-                    
-# @schema
-# class Stack(djp.Lookup, Fill):
-#     hash_name = 'stack_hash'
-#     hash_part_table_names = True
-#     definition = """
-#         # Stack data
-#         stack_hash           :    varchar(8)     # stack hash
-#         ---
-#         ts_inserted=CURRENT_TIMESTAMP : timestamp
-#         """
-    
-#     @classmethod
-#     def fill(cls, parts_kws={}):
-#         for part in cls.parts(**parts_kws if parts_kws != {} else dict(as_cls=True)):
-#             try:
-#                 part.fill()
-#             except:
-#                 traceback.print_exc()
-#                 print(f'Could not fill for part: {part.table_name}')
+        @classmethod
+        def fill(cls):
+            for key in cls.key_source:
+                try:
+                    for stats in apu.get_stats_from_cv_path(key['cv_path']):
+                        axes = ['x', 'y', 'z']
+                        names = ['res', 'min_pt', 'max_pt', 'ctr_pt', 'voxel_offset']
+                        to_insert = [{name + '_' + c: q for c, q in zip(axes, quantity)} for name, quantity in zip(names, [stats[n] for n in names])]
+                        cls.insert1({
+                            **key, 
+                            **{'adjustment_set': m65crg.AdjustmentSet.hash1([{'adjustment': 'resample'}])},
+                            **{'mip': stats['mip']},
+                            **{k: v for t in to_insert for k, v in t.items()},
+                        }, ignore_extra_fields=True, skip_duplicates=True, insert_to_master=True)
+                except:
+                    print(f'Could not insert from cloudvolume for key: {key}')      
 
-#     class EM(djp.Part):
-#         enable_hashing = True
-#         hash_name = 'stack_hash'
-#         hashed_attrs = EMAdjusted.heading.primary_key
-#         definition = """
-#         # EM stack data
-#         -> master
-#         ---
-#         -> EMAdjusted
-#         data                 :    blob@stacks    # stack file
-#         """
-        
-#         @classmethod
-#         def fill_stack_from_cloudvolume(cls, key):
-#             source = EM.proj('cv_path') * EMAdjusted.MIP & key
-#             super().fill_stack_from_cloudvolume(source)
-        
-#         @classmethod
-#         def fill_stack_from_numpy_path(cls, key, numpy_path):
-#             source = EMAdjusted & key
-#             super().fill_stack_from_cloudvolume(source, numpy_path)
+
+
+class Stack(em.Stack):
+    @classmethod
+    def get_stack_from_cloudvolume(cls, source_rel):
+        cv_path = source_rel.fetch1('cv_path')
+        mip = source_rel.fetch1('mip')
+        segment_id= source_rel.fetch1('segment_id') if 'segment_id' in source_rel.heading.attributes else None
+        return apu.get_stack_from_cv_path(cv_path=cv_path, mip=mip, seg_ids=segment_id)
+
+    class EMAdjusted(em.Stack.EMAdjusted):
+        @classproperty
+        def cloudvolume_source(cls):
+            return EM.proj('cv_path') * EMAdjusted.CloudVolume
+
+        @classmethod
+        def fill_stack_from_cloudvolume(cls, key):
+            destination = config.externals['minnie_stacks']['location']
+            source_rel = cls.cloudvolume_source & key
+            stack = cls.master.get_stack_from_cloudvolume(source_rel)
+
+            # make file path
+            key = source_rel.fetch1()
+            key['ts_downloaded'] = str(datetime.now())
+            filepath = Path(destination).joinpath(cls.hash1(key)).with_suffix('.npy')
+            key['filepath'] = filepath
+            key['data'] = filepath
             
-#     class EMSeg(djp.Part):
-#         enable_hashing = True
-#         hash_name = 'stack_hash'
-#         hashed_attrs = EMSegAdjusted.heading.primary_key
-#         definition = """
-#         # EM segmentation stack data
-#         -> master
-#         ---
-#         -> EMSegAdjusted
-#         data                 :    blob@stacks    # stack file
-#         """
+            # save file
+            np.save(filepath, stack)
+            cls.insert1(key, insert_to_master=True, ignore_extra_fields=True)
+
+        @classmethod
+        def fill_from_path(cls, source_path, destination):
+            pass
+      
+    class EMSeg(em.Stack.EMSeg):
+        @classproperty
+        def cloudvolume_source(cls):
+            return EMSeg.proj('em_seg_name') * EMSeg.CloudVolume.proj('cv_path', 'segment_id') * EMSegAdjusted.CloudVolume
         
-#         @classmethod
-#         def fill_stack_from_cloudvolume(cls, key):
-#             source = EMSeg.proj('cv_path') * EMSegAdjusted.MIP & key
-#             super().fill_stack_from_cloudvolume(source)
-        
-#         @classmethod
-#         def fill_stack_from_numpy_path(cls, key, numpy_path):
-#             source = EMSegAdjusted & key
-#             super().fill_stack_from_cloudvolume(source, numpy_path)
+        @classmethod
+        def fill_stack_from_cloudvolume(cls, key):
+            destination = config.externals['minnie_stacks']['location']
+            source_rel = cls.cloudvolume_source & key
+            stack = cls.master.get_stack_from_cloudvolume(source_rel)
+
+            # make file path
+            key = source_rel.fetch1()
+            key['ts_downloaded'] = str(datetime.now())
+            filepath = Path(destination).joinpath(cls.hash1(key)).with_suffix('.npy')
+            key['filepath'] = filepath
+            key['data'] = filepath
             
-#         # TODO add method for resizing and cropping EM stack using latest torch version
-#             # em_cropped = em[top[0]:-bottom[0], top[1]:-bottom[1] ,top[2]:-bottom[2]] # em cropped to align with segmentation size
-# #             um_sizes = em_cropped.shape * cv_em.resolution / 1000
-# #             em_resized = utils.resize(em_cropped, um_sizes, 1)
+            # save file
+            np.save(filepath, stack)
+            cls.insert1(key, insert_to_master=True, ignore_extra_fields=True)
 
-
-# def fill_schema():
-#     for table in [EM, EMAdjusted, EMSeg, EMSegAdjusted]:
-#         print(f'--> Filling {table.__name__} table...')
-#         table.fill()
-#     print('Complete.')
+        @classmethod
+        def fill_stack_from_numpy_path(cls, key, numpy_path):
+            pass
+            
+        # TODO add method for resizing and cropping EM stack using latest torch version
+            # em_cropped = em[top[0]:-bottom[0], top[1]:-bottom[1] ,top[2]:-bottom[2]] # em cropped to align with segmentation size
+#             um_sizes = em_cropped.shape * cv_em.resolution / 1000
+#             em_resized = utils.resize(em_cropped, um_sizes, 1)

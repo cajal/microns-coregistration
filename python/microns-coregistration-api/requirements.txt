@@ -1,2 +1,4 @@
 datajoint-plus
 microns-utils
+em_coregistration@git+https://github.com/AllenInstitute/em_coregistration@phase3#egg=em_coregistration
+wridgets@git+https://github.com/spapa013/wridgets#egg=wridgets

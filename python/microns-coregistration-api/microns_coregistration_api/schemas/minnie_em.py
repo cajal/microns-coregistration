@@ -46,7 +46,6 @@ class EM(djp.Lookup):
 @schema
 class EMAdjusted(djp.Lookup):
     hash_name = 'em_adjusted'
-    hash_part_table_names = True
     definition = """
     # Adjusted versions of aligned em volume
     -> EM
@@ -81,6 +80,10 @@ class EMAdjusted(djp.Lookup):
         voxel_offset_y         : float            # voxel offset y
         voxel_offset_z         : float            # voxel offset z
         """
+        
+        @property
+        def key_source(self):
+            return EM()
 
     class Custom(djp.Part):
         enable_hashing = True
@@ -110,13 +113,13 @@ class EMAdjusted(djp.Lookup):
 
 @schema
 class EMSeg(djp.Lookup):
-    hash_part_table_names = True
     hash_name = 'em_seg'
     definition = """
     # Segmentations of aligned EM volumes
     -> EM
     em_seg                     :    varchar(8)      # hash of em segmentation
     ---
+    em_seg_name            : varchar(48)      # name of em segmentation
     ts_inserted=CURRENT_TIMESTAMP : timestamp
     """
 
@@ -128,7 +131,6 @@ class EMSeg(djp.Lookup):
         # segmentations hosted on CloudVolume 
         -> master
         ---
-        em_seg_name            : varchar(48)      # name of em segmentation
         res_x                  : float            # resolution x, nanometers/ voxel
         res_y                  : float            # resolution y, nanometers/ voxel
         res_z                  : float            # resolution z, nanometers/ voxel
@@ -153,7 +155,6 @@ class EMSeg(djp.Lookup):
 @schema
 class EMSegAdjusted(djp.Lookup):
     hash_name = 'em_seg_adjusted'
-    hash_part_table_names = True
     definition = """
     # Adjusted versions of EM segmentations
     -> EMSeg
@@ -187,6 +188,46 @@ class EMSegAdjusted(djp.Lookup):
         voxel_offset_x         : float            # voxel offset x
         voxel_offset_y         : float            # voxel offset y
         voxel_offset_z         : float            # voxel offset z
+        """
+
+        @property
+        def key_source(self):
+            return EMSeg.CloudVolume() 
+@schema
+class Stack(djp.Lookup):
+    hash_name = 'em_stack_hash'
+    definition = """
+        # Stack data
+        em_stack_hash           :    varchar(8)     # em stack hash
+        ---
+        filepath : varchar(250) # path to file
+        ts_inserted=CURRENT_TIMESTAMP : timestamp
+        """
+
+    class EMAdjusted(djp.Part):
+        enable_hashing = True
+        hash_name = 'em_stack_hash'
+        hashed_attrs = EMAdjusted.heading.primary_key + ['ts_downloaded']
+        definition = """
+        # EM stack data
+        -> master
+        ts_downloaded : varchar(128) # timestamp the stack was downloaded
+        ---
+        -> EMAdjusted
+        data                 :    <minnie_stacks>    # em stack file
+        """
+    
+    class EMSeg(djp.Part):
+        enable_hashing = True
+        hash_name = 'em_stack_hash'
+        hashed_attrs = EMSegAdjusted.heading.primary_key + ['ts_downloaded']
+        definition = """
+        # EM segmentation stack data
+        -> master
+        ts_downloaded : varchar(128) # timestamp the stack was downloaded
+        ---
+        -> EMSegAdjusted
+        data                 :    <minnie_stacks>    # stack file
         """
 
 schema.spawn_missing_classes()

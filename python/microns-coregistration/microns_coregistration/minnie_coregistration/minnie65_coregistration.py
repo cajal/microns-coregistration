@@ -43,3 +43,16 @@ class AdjustmentSet(m65crg.AdjustmentSet):
 
         for s in sets:
             cls.fill_set(s)
+
+
+class TPStack(m65crg.TPStack): pass
+
+
+class Coregistration(m65crg.Coregistration):
+    
+    class AIBS(m65crg.Coregistration.AIBS):
+
+        @classmethod
+        def fill(cls):
+            m65 = djp.create_djp_module(schema_name='microns_minnie65_02')
+            cls.insert(m65.Coregistration, insert_to_master=True)

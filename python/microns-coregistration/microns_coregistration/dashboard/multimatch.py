@@ -1,5 +1,5 @@
 """
-DataJoint tables for MultMatch tool.
+DataJoint tables for multimatch
 """
 
 import datajoint_plus as djp
