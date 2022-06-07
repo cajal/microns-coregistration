@@ -1,4 +1,3 @@
-slackclient
 datajoint-plus
 microns-utils
 em_coregistration@git+https://github.com/AllenInstitute/em_coregistration@phase3#egg=em_coregistration
