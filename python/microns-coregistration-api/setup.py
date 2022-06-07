@@ -16,5 +16,7 @@ setup(
     description="api for microns-coregistration",
     author="Stelios Papadopoulos, Christos Papadopoulos",
     packages=find_packages(),
+    include_package_data=True,
+    package_data={'': ['transform/data/*.npy']},
     install_requires=requirements
 )

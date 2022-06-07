@@ -1,0 +1,4 @@
+include requirements.txt
+include README.md
+include LICENSE
+graft microns_coregistration_api/transform/data
