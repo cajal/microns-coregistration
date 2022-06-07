@@ -38,14 +38,14 @@ minnie65_manual_match_config = SchemaConfig(
 
 dashboard_config = SchemaConfig(
     module_name='dashboard',
-    schema_name='microns_coregistration_dashboard',
+    schema_name='microns_external_dashboard',
     externals=externals.dashboard,
     adapters=adapters.dashboard
 )
 
 multimatch_config = SchemaConfig(
     module_name='multimatch',
-    schema_name='microns_multimatch',
+    schema_name='microns_external_multimatch',
     externals=externals.multimatch,
     adapters=adapters.multimatch
 )
