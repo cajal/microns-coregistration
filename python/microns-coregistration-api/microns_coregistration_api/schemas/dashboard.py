@@ -7,7 +7,7 @@ import datajoint as dj
 from microns_utils.datetime_utils import current_timestamp
 from microns_utils.version_utils import check_package_version
 from microns_utils.misc_utils import classproperty, unwrap
-from ..utils.slack_utils import SlackForWidget
+from microns_utils.widget_utils import SlackForWidget
 from ..config import dashboard_config as config
 
 config.register_externals()
