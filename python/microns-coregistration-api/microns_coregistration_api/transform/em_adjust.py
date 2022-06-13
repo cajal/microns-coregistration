@@ -288,13 +288,13 @@ class EMAdjust:
         method = cls._validate_method(method)
 
         if method == 'linear':
-            return PolyModel(data[:, [0, 2]], data[:, [1]], **method_params[method])
+            return PolyModel(features=data[:, [0, 2]], targets=data[:, [1]], **method_params[method])
             
         if method == 'quadratic':
-            return PolyModel(data[:, [0, 2]], data[:, [1]], **method_params[method])
+            return PolyModel(features=data[:, [0, 2]], targets=data[:, [1]], **method_params[method])
             
         if method == 'interpolation':
-            return InterpModel(data[:, [0, 2]], data[:, [1]], **method_params[method])
+            return InterpModel(features=data[:, [0, 2]], targets=data[:, [1]], **method_params[method])
     
     @classmethod
     def _normalize(cls, points, pia_y, wm_y):
