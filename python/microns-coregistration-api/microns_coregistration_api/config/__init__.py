@@ -49,3 +49,10 @@ multimatch_config = SchemaConfig(
     externals=externals.multimatch,
     adapters=adapters.multimatch
 )
+
+cell_type_trainer_config = SchemaConfig(
+    module_name='cell_type_trainer',
+    schema_name='microns_external_cell_type_trainer',
+    externals=externals.cell_type_trainer,
+    adapters=adapters.cell_type_trainer
+)
