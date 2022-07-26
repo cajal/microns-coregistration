@@ -92,7 +92,10 @@ class CellTypeTrainer(wra.App):
 
         # build app
         self.core = header_app - user_app - mat_app - seg_app - ng_app - res_app
-    
+        
+        if kwargs.get('display'):
+            self.display()
+
     def on_access(self):
         ctnr.User.on_access(self.user)
     
