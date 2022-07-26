@@ -1,6 +1,7 @@
 """
 DataJoint tables for Coregistration Dashboard.
 """
+import json
 import os
 import datajoint_plus as djp
 import datajoint as dj
@@ -15,7 +16,7 @@ config.register_adapters(context=locals())
 
 schema = djp.schema(config.schema_name, create_schema=True)
 
-slack_client = SlackForWidget()
+slack_client = SlackForWidget(default_channel='#platinum_tracer_notifications')
 
 os.environ['DJ_LOGLEVEL'] ='WARNING'
 logger = djp.getLogger(__name__, level='WARNING', update_root_level=True)
@@ -25,8 +26,13 @@ class Tag(djp.Lookup):
     definition = """
     tag : varchar(32) # github tag of repository
     """
-    contents = [{'tag': check_package_version(package='microns-coregistration-api')}]
 
+    @classproperty
+    def contents(cls):
+        cls.insert1({
+            'tag': check_package_version(package='microns-coregistration-api')
+        }, ignore_extra_fields=True, skip_duplicates=True)
+        return {}
 
 @schema
 class User(djp.Lookup):
@@ -66,12 +72,12 @@ class UserInputType(djp.Lookup):
 
         @classproperty
         def contents(cls):
-            contents = [
+            cls.insert([
                 {'user_input_type': 'slack_username'},
-            ]
-            for content in contents:
-                cls.master.insert1({cls.master.hash_name: cls.hash1(content)}, ignore_extra_fields=True, skip_duplicates=True)
-            return contents
+                {'user_input_type': 'datajoint_username'}
+            ], ignore_extra_fields=True, skip_duplicates=True, insert_to_master=True)
+            return {}
+
 
 
 @schema
@@ -83,7 +89,13 @@ class UserInput(djp.Lookup):
     @classmethod
     def get(cls, key):
         return cls.r1p(key).get(key)
-        
+
+    @classmethod
+    def on_input(cls, user, user_input_type, user_input):
+        user_input_type_id = UserInputType.r1p({'user_input_type': user_input_type}).fetch1('user_input_type_id')
+
+
+
     class Username(djp.Part):
         enable_hashing = True
         hash_name = 'user_input_id'
@@ -101,8 +113,7 @@ class UserInput(djp.Lookup):
             return unwrap((self & key).fetch('user', 'user_input_type_id', 'user_input', 'user_input_id', as_dict=True))
 
         @classmethod
-        def on_input(cls, user, user_input_type, user_input):
-            user_input_type_id = UserInputType.Username.hash1({'user_input_type': user_input_type})
+        def on_input(cls, user, user_input_type_id, user_input):
             cls.insert1({
                 'user': user, 
                 'user_input_type_id': user_input_type_id,
@@ -111,6 +122,33 @@ class UserInput(djp.Lookup):
                 }, insert_to_master=True)
             UserEvent.Input.add_event(user, user_input_type_id, cls.get_latest_entries().fetch1('user_input_id'))
             Username.populate()
+    
+    class Submission(djp.Part):
+        enable_hashing = True
+        hash_name = 'user_input_id'
+        hashed_attrs = 'user', 'user_input_type_id', 'ts_inserted'
+        definition = """
+        -> master
+        ---
+        -> User
+        -> UserInputType
+        user_input: longblob
+        ts_inserted : timestamp
+        """
+
+        def get(self, key):
+            return unwrap((self & key).fetch('user', 'user_input_type_id', 'user_input', 'user_input_id', as_dict=True))
+
+        @classmethod
+        def on_input(cls, user, user_input_type_id, user_input_hash):
+            cls.insert1({
+                'user': user, 
+                'user_input_type_id': user_input_type_id,
+                'ts_inserted': current_timestamp('US/Central', fmt="%Y-%m-%d_%H:%M:%S"),
+                'user_input': json.dumps(user_input_hash)
+                }, insert_to_master=True)
+            UserEvent.Input.add_event(user, user_input_type_id, cls.get_latest_entries().fetch1('user_input_id'))
+
 
 # METHODS
 
@@ -135,12 +173,12 @@ class UserInputHandler(djp.Lookup):
         -> Tag
         ts_inserted=CURRENT_TIMESTAMP : timestamp
         """
+
         @classproperty
         def contents(cls):
-            contents = Tag.fetch(as_dict=True)
-            for content in contents:
-                cls.master.insert1({cls.master.hash_name: cls.hash1(content)}, ignore_extra_fields=True, skip_duplicates=True)
-            return contents
+            tags = Tag.fetch(as_dict=True)
+            cls.insert(tags, ignore_extra_fields=True, skip_duplicates=True, insert_to_master=True)
+            return {}   
 
         def run(self, **kwargs):
             params = self.fetch1()
