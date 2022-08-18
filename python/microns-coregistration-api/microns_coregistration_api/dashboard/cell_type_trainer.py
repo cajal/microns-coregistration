@@ -13,11 +13,11 @@ import wridgets.app as wra
 
 from microns_materialization_api.schemas import \
     minnie65_materialization as m65mat
+from microns_materialization_api.dashboard.applets import \
+    SetMaterializationApp
 from microns_morphology_api.schemas import \
     minnie65_auto_proofreading as m65auto
 import microns_utils.ng_utils as ngu
-
-from .applets import UserApp, MatApp
 
 # from ..schemas import dashboard as db
 from ..schemas import cell_type_trainer as ctnr
@@ -30,10 +30,8 @@ logger = djp.getLogger(__name__)
 
 class CellTypeTrainer(wra.App):
     store_config = [
-        'user_info',
-        'user',
         'ver',
-        ('autoproof_source', m65auto.AutoProofreadNeuron & 'baylor_cell_type_after_proof=external_cell_type' & 'baylor_cell_type_exc_probability_after_proof>0.95'),
+        ('autoproof_source', m65auto.AutoProofreadNeuron & 'baylor_cell_type_after_proof=external_cell_type' & 'baylor_cell_type_exc_probability_after_proof>0.95'), 
         ('segment_source', m65mat.Segment.Nucleus),
         'segment_options',
         'segment',
@@ -42,20 +40,17 @@ class CellTypeTrainer(wra.App):
     ]
     
     def make(self, **kwargs):
-        self.user_info = kwargs.get('user_info')
-        self.user = self.user_info.get('name')
-        assert self.user is not None, f'Provide user to {self.name}'
+        self._user = kwargs.get('user')
+        self._user_app = kwargs.get('user_app')
         
-        # child apps
+        # core apps
         header_app = wra.App(
             wra.Label(text='Cell Type Trainer', fontsize=2, name='HeaderLabel') - \
             wra.Link(link_kws=dict(src='https://docs.google.com/presentation/d/1Gruve0SmsBkzVOpJA_IWXGIj88LkmFDzjBQSIsjuLb8/edit?usp=sharing', text='Training Link'), name='HeaderTrainingLink'),
             name='HeaderApp'
         )
-        
-        user_app = UserApp(user_info=self.user_info, on_access=self.on_access)
-        
-        mat_app = MatApp(on_select=self.select_mat)
+
+        mat_app = SetMaterializationApp(on_select=self.select_mat, name='MatApp')
                                              
         seg_app = wra.App(
                 wra.Label(text='Segment ID', name='SegLabel') + \
@@ -91,13 +86,14 @@ class CellTypeTrainer(wra.App):
         )
 
         # build app
-        self.core = header_app - user_app - mat_app - seg_app - ng_app - res_app
+        self.core = header_app - mat_app - seg_app - ng_app - res_app
         
         if kwargs.get('display'):
             self.display()
-
-    def on_access(self):
-        ctnr.User.on_access(self.user)
+    
+    @property
+    def user(self):
+        return self._user_app.user if self._user is None else self._user
     
     def set_ver(self, ver=None):
         self.ver = ver
