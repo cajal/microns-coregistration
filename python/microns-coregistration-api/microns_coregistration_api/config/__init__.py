@@ -36,13 +36,6 @@ minnie65_manual_match_config = SchemaConfig(
     adapters=adapters.minnie65_manual_match
 )
 
-dashboard_config = SchemaConfig(
-    module_name='dashboard',
-    schema_name='microns_external_dashboard',
-    externals=externals.dashboard,
-    adapters=adapters.dashboard
-)
-
 multimatch_config = SchemaConfig(
     module_name='multimatch',
     schema_name='microns_external_multimatch',
@@ -50,9 +43,9 @@ multimatch_config = SchemaConfig(
     adapters=adapters.multimatch
 )
 
-cell_type_trainer_config = SchemaConfig(
-    module_name='cell_type_trainer',
-    schema_name='microns_external_cell_type_trainer',
-    externals=externals.cell_type_trainer,
-    adapters=adapters.cell_type_trainer
+cell_typer_config = SchemaConfig(
+    module_name='cell_typer',
+    schema_name='microns_external_cell_typer',
+    externals=externals.cell_typer,
+    adapters=adapters.cell_typer
 )
