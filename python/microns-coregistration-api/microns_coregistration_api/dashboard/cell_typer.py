@@ -26,9 +26,6 @@ from ..schemas import cell_typer as database
 
 logger = djp.getLogger(__name__)
 
-
-
-
 class CellTyper(wra.App):
     store_config = [
         'ver',
@@ -203,9 +200,11 @@ class CellTyper(wra.App):
     
     def submit(self):
         def submit_to_database():
+            event = None
             with wr.Output():
                 event = database.Event.log_event('cell_type_submission', {'user': self.user}, data=submission)
-            submission_id = (database.Submission.Maker * database.Submission.CellType() & {'event_id': event.id}).fetch1('submission_id')
+            assert event is not None, 'event did not run successfully. See Logs.'
+            submission_id = (database.Submission.Add * database.Submission.CellType() & {'event_id': event.id}).fetch1('submission_id')
             self.clear_segment()
             feedback = {
                     'Submission ID': submission_id,
@@ -218,10 +217,6 @@ class CellTyper(wra.App):
                 })
             
             feedback.update({'Note': note})
-
-            # def flag_submission():
-            #     with wr.Output():
-            #         event = database.Event.log_event('flagged_submission', {'user': self.user}, data={'segment_id': segment})
 
             self.msg(
                 wra.Label(text=" <p> ".join(['<b>' + k + '</b>' + ': ' + v for k, v in feedback.items()])) - self.clear_button, with_clear_button=False
