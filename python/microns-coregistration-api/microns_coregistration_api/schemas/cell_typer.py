@@ -173,6 +173,7 @@ class Protocol(djp.Lookup):
         ---
         active=0 : tinyint # 1 if active, 0 if inactive
         ordering=NULL : tinyint # order of protocol from right to left, default NULL is placed at the end
+        last_updated=CURRENT_TIMESTAMP : timestamp
         """
         @classproperty
         def contents(cls):
