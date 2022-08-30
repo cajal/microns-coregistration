@@ -52,7 +52,7 @@ class CellTyper(wra.App):
 
         materialization_app = MaterializationManager(on_select=self.set_ver, set_button='stable', name='MatApp')
 
-        protocol_app = ProtocolManager(source=database.Protocol.Manager, on_select=self.set_protocol, name='ProtocolApp')
+        protocol_app = ProtocolManager(source=database.Protocol.Manager & database.Tag.get_latest_entries(), on_select=self.set_protocol, name='ProtocolApp')
                                              
         segment_app = wra.App(
                 wra.Label(text='Segment ID', name='SegLabel') + \
