@@ -3,20 +3,52 @@ from nglui import statebuilder
 from microns_utils.ap_utils import set_CAVEclient
 from coregister.transform.transform import Transform
 from coregister.utils import em_nm_to_voxels
-
+from microns_utils.misc_utils import classproperty
 
 class NgLinks:
-    client = set_CAVEclient('minnie65_phase3_v1')
-    em_src = client.info.image_source()
-    seg_src = client.info.segmentation_source()
-    nuc_src = client.materialize.get_table_metadata('nucleus_detection_v0')['flat_segmentation_source']
-    em_2p_src = 'precomputed://gs://neuroglancer/alex/calcium/minnie/EM_phase3_2p_coords'
-    vess_2p_src = 'precomputed://gs://neuroglancer/alex/calcium/minnie/2pstack_vessels_highres'
-    nuc_seg_src = 'precomputed://gs://neuroglancer/alex/calcium/minnie/nuc_seg_phase3_2p_coords'
+    _client = None
+
+    @classproperty
+    def client(cls):
+        if cls._client is None:
+            cls._client = set_CAVEclient('minnie65_phase3_v1')
+        return cls._client
+    
+    @classproperty
+    def em_src(cls):
+        return cls.client.info.image_source()
+
+    @classproperty
+    def seg_src(cls):
+        return cls.client.info.segmentation_source()
+    
+    @classproperty
+    def nuc_src(cls):
+        return cls.client.materialize.get_table_metadata('nucleus_detection_v0')['flat_segmentation_source']
+    
+    @classproperty
+    def em_2p_src(cls):
+        return 'precomputed://gs://neuroglancer/alex/calcium/minnie/EM_phase3_2p_coords'
+    
+    @classproperty
+    def vess_2p_src(cls):
+        return 'precomputed://gs://neuroglancer/alex/calcium/minnie/2pstack_vessels_highres'
+
+    @classproperty
+    def nuc_seg_src(cls):
+        return 'precomputed://gs://neuroglancer/alex/calcium/minnie/nuc_seg_phase3_2p_coords'
     # image layers
-    em_layer = statebuilder.ImageLayerConfig(em_src, contrast_controls=True, black=0.35, white=0.7)
-    seg_layer = statebuilder.SegmentationLayerConfig(seg_src,  name='seg')
-    nuc_layer = statebuilder.SegmentationLayerConfig(nuc_src, name='nuclear-seg')
+    @classproperty
+    def em_layer(cls):
+        return statebuilder.ImageLayerConfig(cls.em_src, contrast_controls=True, black=0.35, white=0.7)
+    
+    @classproperty
+    def seg_layer(cls):
+        return statebuilder.SegmentationLayerConfig(cls.seg_src,  name='seg')
+    
+    @classproperty
+    def nuc_layer(cls):
+        return statebuilder.SegmentationLayerConfig(cls.nuc_src, name='nuclear-seg')
 
 
 def em_nm_to_voxels_phase3(xyz, x_offset=31000, y_offset=500, z_offset=3150, inverse=False):

@@ -241,11 +241,11 @@ class EMAdjust:
         method, rotation, method_params = self._check_for_defaults(**{'method':method, 'rotation':rotation, 'method_params':method_params})
         
         self.method = self._validate_method(method)
-        self.rotation = rotation
+        self.rotation = 0 if rotation is None else rotation
         self.method_params = method_params
 
-        self.pia_pts = self.pia_pts if self.rotation is None else rotate_points(self.pia_pts, degree=self.rotation)
-        self.wm_pts = self.wm_pts if self.rotation is None else rotate_points(self.wm_pts, degree=self.rotation)
+        self.pia_pts = self.pia_pts if self.rotation == 0 else rotate_points(self.pia_pts, degree=self.rotation)
+        self.wm_pts = self.wm_pts if self.rotation == 0 else rotate_points(self.wm_pts, degree=self.rotation)
         
         # solve models
         self.pia_model = self.solve(self.pia_pts, self.method, self.method_params)
@@ -288,13 +288,13 @@ class EMAdjust:
         method = cls._validate_method(method)
 
         if method == 'linear':
-            return PolyModel(data[:, [0, 2]], data[:, [1]], **method_params[method])
+            return PolyModel(features=data[:, [0, 2]], targets=data[:, [1]], **method_params[method])
             
         if method == 'quadratic':
-            return PolyModel(data[:, [0, 2]], data[:, [1]], **method_params[method])
+            return PolyModel(features=data[:, [0, 2]], targets=data[:, [1]], **method_params[method])
             
         if method == 'interpolation':
-            return InterpModel(data[:, [0, 2]], data[:, [1]], **method_params[method])
+            return InterpModel(features=data[:, [0, 2]], targets=data[:, [1]], **method_params[method])
     
     @classmethod
     def _normalize(cls, points, pia_y, wm_y):
