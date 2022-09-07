@@ -50,7 +50,7 @@ class User(djp.Lookup):
         
         @classproperty
         def contents(cls):
-            cls.insert(db.User.Add.proj(), ignore_extra_fields=True, skip_duplicates=True, insert_to_master=True)
+            cls.insert(db.User, ignore_extra_fields=True, skip_duplicates=True, insert_to_master=True)
             return {}
 
 @schema
