@@ -6,7 +6,7 @@ import datajoint_plus as djp
 
 from ..config import minnie65_coregistration_config as config
 from microns_nda_api.schemas import minnie_nda as nda
-from ..transform.coregistration import aibs_coreg_transform
+from ..methods import aibs_coreg_transform
 from microns_utils.misc_utils import unwrap
 
 config.register_externals()
@@ -98,4 +98,3 @@ class Coregistration(djp.Lookup):
             
         
 schema.spawn_missing_classes()
-schema.connection.dependencies.load()

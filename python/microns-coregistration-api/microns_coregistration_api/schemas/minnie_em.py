@@ -193,6 +193,7 @@ class EMSegAdjusted(djp.Lookup):
         @property
         def key_source(self):
             return EMSeg.CloudVolume() 
+
 @schema
 class Stack(djp.Lookup):
     hash_name = 'em_stack_hash'
@@ -231,4 +232,4 @@ class Stack(djp.Lookup):
         """
 
 schema.spawn_missing_classes()
-schema.connection.dependencies.load()
+

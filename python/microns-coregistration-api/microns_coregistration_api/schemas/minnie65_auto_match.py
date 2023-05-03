@@ -12,4 +12,3 @@ config.register_adapters(context=locals())
 schema = djp.schema(config.schema_name, create_schema=True)
 
 schema.spawn_missing_classes()
-schema.connection.dependencies.load()
