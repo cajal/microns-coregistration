@@ -15,10 +15,9 @@ from microns_materialization_api.schemas import \
     minnie65_materialization as m65mat
 from microns_morphology_api.schemas import \
     minnie65_auto_proofreading as m65auto
-
+import microns_utils.datajoint_utils as dju
 from microns_dashboard_api.schemas import \
     dashboard as db
-import microns_dashboard_api as mdb
 
 from ..config import cell_typer_config as config
 
@@ -28,7 +27,7 @@ config.register_adapters(context=locals())
 schema = djp.schema(config.schema_name, create_schema=True)
 
 @schema
-class Tag(mdb.VersionLookup):
+class Tag(dju.VersionLookup):
     package = 'microns-coregistration-api'
     attr_name = 'tag'
 
@@ -50,7 +49,7 @@ class User(djp.Lookup):
         
         @classproperty
         def contents(cls):
-            cls.insert(db.User.Add.proj(), ignore_extra_fields=True, skip_duplicates=True, insert_to_master=True)
+            cls.insert(db.User, ignore_extra_fields=True, skip_duplicates=True, insert_to_master=True)
             return {}
 
 @schema
@@ -181,13 +180,13 @@ class Protocol(djp.Lookup):
             return {}
             
 @schema
-class Event(mdb.EventLookup):
+class Event(dju.EventLookup):
     basedir = Path(config.externals.get('cell_typer_files').get('location'))
     extra_secondary_attrs = f"""
     -> {Tag.class_name}
     """
 
-    class Submission(mdb.Event):
+    class Submission(dju.Event):
         events = 'cell_type_submission', 'flagged_submission'
         constant_attrs = {Tag.attr_name: Tag.version}
         extra_primary_attrs = f"""
@@ -201,7 +200,7 @@ class Event(mdb.EventLookup):
             Submission.Add.populate({'event_id': event.id})
 
 @schema
-class EventHandler(mdb.EventHandlerLookup):
+class EventHandler(dju.EventHandlerLookup):
     @classmethod
     def run(cls, key):
         handler = cls.r1p(key)
@@ -215,7 +214,7 @@ class EventHandler(mdb.EventHandlerLookup):
         cls.Log('info', '%s ran successfully.', handler.class_name)
         return key
 
-    class Submission(mdb.EventHandler):
+    class Submission(dju.EventHandler):
         hashed_attrs = 'event', Tag.attr_name
         constant_attrs = {Tag.attr_name: Tag.version}
         extra_primary_attrs = f"""
@@ -265,7 +264,7 @@ class Submission(djp.Lookup):
     timestamp=CURRENT_TIMESTAMP : timestamp # 
     """
 
-    class Add(mdb.Maker):
+    class Add(dju.Maker):
         hash_name = 'submission_id'
         upstream = Event
         method = EventHandler
@@ -305,4 +304,3 @@ class Submission(djp.Lookup):
         """
 
 schema.spawn_missing_classes()
-schema.connection.dependencies.load()

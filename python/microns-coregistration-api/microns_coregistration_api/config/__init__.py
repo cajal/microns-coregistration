@@ -49,3 +49,10 @@ cell_typer_config = SchemaConfig(
     externals=externals.cell_typer,
     adapters=adapters.cell_typer
 )
+
+minnie65_boundaries_config = SchemaConfig(
+    module_name='minnie65_boundaries',
+    schema_name='microns_minnie65_boundaries',
+    externals=externals.minnie65_boundaries,
+    adapters=adapters.minnie65_boundaries
+)
