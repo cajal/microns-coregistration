@@ -32,7 +32,8 @@ multimatch = {
     'multimatch_stacks': djp.make_store_dict(multimatch_stack_path)
 }
 
-
 cell_typer = {
     'cell_typer_files': djp.make_store_dict(cell_typer_path)
 }
+
+minnie65_boundaries = {}

@@ -14,3 +14,4 @@ minnie65_coregistration = {}
 minnie65_manual_match = {}
 multimatch = {'multimatch_stacks': multimatch_stacks}
 cell_typer = {'cell_typer_files': cell_typer_files}
+minnie65_boundaries = {}
