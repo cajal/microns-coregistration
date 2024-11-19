@@ -12,11 +12,14 @@ from sklearn.linear_model import LogisticRegression
 
 logger = logging.getLogger(__name__)
 
-nm_per_vx = np.array([4, 4, 40]) # from precomputed://https://bossdb-open-data.s3.amazonaws.com/iarpa_microns/minnie/minnie65/em data bounds
-em_bounds_vx = np.array([[27648, 27648, 14816], [453632, 388096, 27904]]) # from graphene://https://minnie.microns-daf.com/segmentation/table/minnie3_v1
-seg_bounds_vx = np.array([[52770, 60616, 14850], [437618, 322718, 27858]])
+tp_bounds_um = np.array([[   0,    0,    0], [1412, 1322,  670]]) # stack_session 9, stack_idx 19
+nm_per_vx = np.array([4, 4, 40]) 
+em_bounds_vx = np.array([[27648, 27648, 14816], [453632, 388096, 27904]]) # from precomputed://https://bossdb-open-data.s3.amazonaws.com/iarpa_microns/minnie/minnie65/em data bounds
+seg_bounds_vx = np.array([[52770, 60616, 14850], [437618, 322718, 27858]]) # from graphene://https://minnie.microns-daf.com/segmentation/table/minnie3_v1
+nuc_bounds_vx = np.array([[48000, 60608, 14825], [441216, 322752, 27881]]) # from precomputed://https://bossdb-open-data.s3.amazonaws.com/iarpa_microns/minnie/minnie65/nuclei
 em_bounds_nm = em_bounds_vx * nm_per_vx
 seg_bounds_nm = seg_bounds_vx * nm_per_vx
+nuc_bounds_nm = nuc_bounds_vx * nm_per_vx
 
 available_bounds = {
     'em': em_bounds_nm,
