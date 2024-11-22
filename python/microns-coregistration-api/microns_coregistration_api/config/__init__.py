@@ -56,3 +56,17 @@ minnie65_boundaries_config = SchemaConfig(
     externals=externals.minnie65_boundaries,
     adapters=adapters.minnie65_boundaries
 )
+
+minnie_field_images = SchemaConfig(
+    module_name='minnie_field_images',
+    schema_name='microns_minnie_field_images',
+    externals=externals.minnie_field_images,
+    adapters=adapters.minnie_field_images
+)
+
+minnie65_calcium_sim_config = SchemaConfig(
+    module_name='minnie65_calcium_sim',
+    schema_name='microns_minnie65_calcium_sim',
+    externals=externals.minnie65_calcium_sim,
+    adapters=adapters.minnie65_calcium_sim
+)

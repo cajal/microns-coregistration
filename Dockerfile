@@ -1,5 +1,7 @@
-FROM at-docker.ad.bcm.edu:5000/microns-base 
+FROM at-docker:5000/microns-base:cuda11.8.0-python3.8
 LABEL maintainer="Stelios Papadopoulos <spapadop@bcm.edu>"
+
+RUN python -m pip install --no-cache-dir --upgrade jupyterlab
 
 RUN pip3 install \
         cloud-volume \
@@ -7,16 +9,11 @@ RUN pip3 install \
         nglui \
         slackclient
 
-WORKDIR /root
+WORKDIR /
 ARG CLOUDVOLUME_TOKEN
 RUN mkdir -p .cloudvolume/secrets
 RUN echo "{\"token\": \"${CLOUDVOLUME_TOKEN:-}\"}" > .cloudvolume/secrets/cave-secret.json
 
-# ALLEN INSTITUTE
-RUN pip3 install git+https://github.com/AllenInstitute/em_coregistration.git@phase3
-
-# CURRENT PACKAGE
-# TODO: torch rebuilds partially after edit, consider improving docker caching (e.g. maybe with requirements.txt install in separate step)
 COPY . /src/microns-coregistration
-RUN pip install --prefix=$(python -m site --user-base) -e /src/microns-coregistration/python/microns-coregistration
-RUN pip install --prefix=$(python -m site --user-base) -e /src/microns-coregistration/python/microns-coregistration-api
+RUN pip install -e /src/microns-coregistration/python/microns-coregistration
+RUN pip install -e /src/microns-coregistration/python/microns-coregistration-api

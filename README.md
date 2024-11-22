@@ -15,6 +15,8 @@ pip install git+https://github.com/cajal/microns-coregistration.git@TAG#subdirec
 ```
 
 # Using the AIBS transform
+adapted from https://github.com/alleninstitute/em_coregistration/tree/phase3
+
 ```python
 from microns_coregistration_api.methods import fetch_aibs_transform, aibs_coreg_transform
 ```

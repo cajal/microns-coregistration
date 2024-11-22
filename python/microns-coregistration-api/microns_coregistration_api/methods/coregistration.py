@@ -12,7 +12,8 @@ logger = logging.getLogger(__name__)
 __location__ = os.path.realpath(
     os.path.join(os.getcwd(), os.path.dirname(__file__)))
 
-aibs_transform_df = pd.read_pickle(Path(__location__).joinpath('./data/Coregistration.pkl'))
+aibs_coreg_df = pd.read_pickle(Path(__location__).joinpath('./data/aibs_coregistration.pkl'))
+
 
 def em_nm_to_voxels_phase3(xyz, x_offset=31000, y_offset=500, z_offset=3150, inverse=False):
     """convert EM nanometers to neuroglancer voxels
@@ -39,9 +40,11 @@ def em_nm_to_voxels_phase3(xyz, x_offset=31000, y_offset=500, z_offset=3150, inv
         vxyz[:, 1] = ((xyz[:, 1] / 4) + y_offset)
         vxyz[:, 2] = ((xyz[:, 2]/40.0) - z_offset)
 
+    return vxyz
+
 
 def fetch_aibs_transform(transform_id):
-    row = aibs_transform_df.query(f'transform_id=={transform_id}')
+    row = aibs_coreg_df.query(f'transform_id=={transform_id}')
     return row[['version', 'direction', 'transform_type', 'transform_solution']].to_dict(orient='records')[0]
 
 
